@@ -8,7 +8,8 @@ from model.box_ops import Boxcoder, box_iou, nms, process_box
 
 class RPNHead(nn.Module):
     def __init__(self, in_channels, num_anchors):
-        super().__init__()
+        super(RPNHead, self).__init__()
+
         self.conv = nn.Conv2d(in_channels, in_channels, kernel_size=3, stride = 1, padding = 1)
         self.cls_logits = nn.Conv2d(in_channels, num_anchors, kernel_size=1)
         self.bbox_pred = nn.Conv2d(in_channels, 4 * num_anchors, 1)
@@ -17,12 +18,12 @@ class RPNHead(nn.Module):
             nn.init.normal_(i.weight, std=0.01)
             nn.init.constant_(i.bias, 0)
 
-        def forward(self, x):
-            x = F.relu(self.conv(x))
-            logits = self.cls_logits(x)
-            bbox_reg = self.bbox_pred(x)
+    def forward(self, x):
+        x = F.relu(self.conv(x))
+        logits = self.cls_logits(x)
+        bbox_reg = self.bbox_pred(x)
 
-            return logits, bbox_reg
+        return logits, bbox_reg
             
 
 class RPNetwork(nn.Module):
@@ -58,9 +59,10 @@ class RPNetwork(nn.Module):
         top_n_idx = objectness.topk(pre_nms_top_n)[1]
         score = objectness[top_n_idx]
         proposal = self.box_coder.decode(pred_box_delta[top_n_idx], anchor[top_n_idx])
-
+        print("@@@@proposal : ", proposal)
         proposal, score = process_box(proposal, score, image_shpae, self.min_size)
-        keep = nms(score, self.nms_thresh)
+        print("@@@ thresh : ", self.nms_thresh, type(self.nms_thresh))
+        keep = nms(proposal, score, self.nms_thresh)
         proposal = proposal[keep]
         return proposal
         
@@ -79,9 +81,10 @@ class RPNetwork(nn.Module):
 
     def forward(self, feature, image_shape, target=None):
         if target is not None:
-            gt_box = target['boxes']
             anchor = self.anchor_generator(feature, image_shape)
-            print("Anchor : ", anchor)
+            gt_box = target['boxes'].to(anchor.device)
+            print("Anchor : ", anchor.shape)
+            print("device check : ", gt_box.device, anchor.device)
             
             objectness, pred_bbox_delta = self.head(feature)
             objectness = objectness.permute(0, 2, 3, 1).flatten()

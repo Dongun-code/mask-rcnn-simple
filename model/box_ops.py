@@ -68,16 +68,22 @@ class Boxcoder:
         target = torch.stack((xmin, ymin, xmax, ymax), dim=1)
         return target
 
-def process_box(box, score, iamge_shape, min_size):
+def process_box(box, score, image_shape, min_size):
     """
     Clip boxes in the image size and remove boxes which are too small
     """
     
-    box[:, [0, 2]] = box[:, [0,2]].clamp(0, iamge_shape[1])
-    box[:, [1, 3]] = box[:, [1,3]].clmap(0, iamge_shape[0])
+    # box[:, [0, 2]] = box[:, [0,2]].clamp(0, image_shape[1])
+    # box[:, [1, 3]] = box[:, [1,3]].clmap(0, image_shape[0])
 
-    w, h = box[:, 2] - box[:0], box[:, 3] - box[:, 1]
-    keep = torch.where(w >= min_size) & (h >= min_size)[0]
+    box[:, [0, 2]] = torch.clamp(box[:, [0,2]], min = 0, max = image_shape[1])
+    box[:, [1, 3]] = torch.clamp(box[:, [1,3]], min = 0, max = image_shape[0])
+    print(box.shape)
+    print("@@@@@box : ", box)
+
+    w, h = box[:, 2] - box[:, 0], box[:, 3] - box[:, 1]
+    print("w, h : ", w, h)
+    keep = torch.where((w >= min_size) & (h >= min_size))[0]
     print("keep : ", keep)
     box, score = box[keep], score[keep]
     return box, score
@@ -93,7 +99,7 @@ def box_iou(box_a, box_b):
         iou (Tensor[N, M]): the NxM matrix containing the pairwise
             IoU values for every element in box_a and box_b
     """
-
+    print("box device", box_a.device, box_b.device)
     lt = torch.max(box_a[:, None, :2], box_b[:, :2])
     rb = torch.min(box_a[:, None, 2:], box_b[:, 2:])
 
@@ -102,7 +108,7 @@ def box_iou(box_a, box_b):
     area_a = torch.prod(box_a[:, 2:] - box_a[:, :2], 1)
     area_b = torch.prod(box_b[:, 2:] - box_b[:, :2], 1)
 
-    return inter / (area_a[:, None], area_b - inter)
+    return inter / (area_a[:, None] + area_b - inter)
 
 
 def nms(box, score, thresold):
@@ -116,4 +122,4 @@ def nms(box, score, thresold):
         keep (Tensor): indices of boxes filtered by NMS.
     """
 
-    return torch.ops.torchvision.nms(box, score, threshold)
+    return torch.ops.torchvision.nms(box, score, thresold)

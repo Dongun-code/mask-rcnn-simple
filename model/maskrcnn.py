@@ -24,9 +24,9 @@ class MaskRCNN(nn.Module):
         super().__init__()
         # self.backbone = backbone
         # self.channels = backbone.out_channels
-        out_channels = 256
-        self.backbone = backbone_factory('resnet101', stage5 = True)
 
+        self.backbone = backbone_factory('resnet101', stage5 = True)
+        out_channels = 2048
         #   RPN
         anchor_sizes = (128, 256, 512)
         anchor_ratios = (0.5, 1, 2)
@@ -66,11 +66,16 @@ class MaskRCNN(nn.Module):
     def forward(self, image, target=None):
         ori_image_shape = image.shape[-2:]
         image, target = self.transformer(image, target)
-        # print(image)
-        # print(image.shape)
-        # image_shape = image.shape[-2:]
+        image_shape = image.shape[-2:]
+
         img = image.cuda()
-        feature = self.backbone(img)
+        # print("im avlie")
+        feature, C5 = self.backbone(img)
+
+        proposal, rpn_losses = self.rpn(C5, image_shape, target)
+        
+
+
 
         # proposal, rpn_losses = self.rpn(feature, image_shape, target)
         # result, roi_losses = self.head
@@ -93,3 +98,7 @@ class FastRCNNPredictor(nn.Module):
 
         return score, bbox_delta
 
+
+class resnet101_maskrcnn(nn.Module):
+    def __init__(self):
+        super().__init__()

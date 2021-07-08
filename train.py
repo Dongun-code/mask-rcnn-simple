@@ -3,7 +3,7 @@ from model.maskrcnn import MaskRCNN
 from load_data.coco import coco_set
 from config import Config as cfg
 import torch
-from torchsummary import summary
+# from torchsummary import summary
 import gc
 gc.collect()
 torch.cuda.empty_cache()
@@ -37,7 +37,7 @@ def main():
         get_gpu_prop(show=True)
     print("\ndevice: {}".format(device))
 
-    dataset_train = coco_set(cfg.COCO_PATH, 'val')
+    dataset_train = coco_set(cfg.COCO_PATH, 'train')
     indices = torch.randperm(len(dataset_train)).tolist()
     d_train = torch.utils.data.Subset(dataset_train, indices)
     model = MaskRCNN('resnet101', 91).to(device)

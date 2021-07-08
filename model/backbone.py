@@ -109,7 +109,8 @@ class ResNet(nn.Module):
         x =  self.C4(x)
         features['C4'] = x
         x =  self.C5(x)
+        C5 = x
         features['C5'] = x
+        print("out_shape", x.shape)
 
-
-        return features
+        return features, C5
