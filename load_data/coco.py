@@ -55,9 +55,9 @@ class coco_set(torch.utils.data.Dataset):
                 
                 #   Need re-write 
                 category_id = label['category_id']
-                id = np.zeros((self.cls_num,))
-                id[category_id] = 1
-                category.append(id)
+                # id = np.zeros((self.cls_num,))
+                # id[category_id] = 1
+                category.append(category_id)
 
                 bbox = label['bbox']
                 # cv2.rectangle(cv_img, (int(bbox[0]), int(bbox[1])), (int(bbox[0])+int(bbox[2]), int(bbox[1])+int(bbox[3])), (255, 0, 0),1)
@@ -78,7 +78,7 @@ class coco_set(torch.utils.data.Dataset):
             boxes = self.convert_to_xyxy(boxes)
             category = torch.tensor(category)
             masks = torch.stack(masks)
-            target = dict(boxes=boxes, labels=category,masks=masks)
+            target = dict(boxes=boxes, labels=category, masks=masks)
 
         return img, target
 

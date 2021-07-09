@@ -78,13 +78,13 @@ def process_box(box, score, image_shape, min_size):
 
     box[:, [0, 2]] = torch.clamp(box[:, [0,2]], min = 0, max = image_shape[1])
     box[:, [1, 3]] = torch.clamp(box[:, [1,3]], min = 0, max = image_shape[0])
-    print(box.shape)
-    print("@@@@@box : ", box)
+    # print(box.shape)
+    # print("@@@@@box : ", box)
 
     w, h = box[:, 2] - box[:, 0], box[:, 3] - box[:, 1]
-    print("w, h : ", w, h)
+    # print("w, h : ", w, h)
     keep = torch.where((w >= min_size) & (h >= min_size))[0]
-    print("keep : ", keep)
+    # print("keep : ", keep)
     box, score = box[keep], score[keep]
     return box, score
 
@@ -99,7 +99,7 @@ def box_iou(box_a, box_b):
         iou (Tensor[N, M]): the NxM matrix containing the pairwise
             IoU values for every element in box_a and box_b
     """
-    print("box device", box_a.device, box_b.device)
+    # print("box device", box_a.device, box_b.device)
     lt = torch.max(box_a[:, None, :2], box_b[:, :2])
     rb = torch.min(box_a[:, None, 2:], box_b[:, 2:])
 

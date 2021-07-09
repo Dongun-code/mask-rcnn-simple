@@ -59,9 +59,9 @@ class RPNetwork(nn.Module):
         top_n_idx = objectness.topk(pre_nms_top_n)[1]
         score = objectness[top_n_idx]
         proposal = self.box_coder.decode(pred_box_delta[top_n_idx], anchor[top_n_idx])
-        print("@@@@proposal : ", proposal)
+        # print("@@@@proposal : ", proposal)
         proposal, score = process_box(proposal, score, image_shpae, self.min_size)
-        print("@@@ thresh : ", self.nms_thresh, type(self.nms_thresh))
+        # print("@@@ thresh : ", self.nms_thresh, type(self.nms_thresh))
         keep = nms(proposal, score, self.nms_thresh)
         proposal = proposal[keep]
         return proposal
@@ -72,6 +72,7 @@ class RPNetwork(nn.Module):
 
         pos_idx, neg_idx = self.fg_bg_sampler(label)
         idx = torch.cat((pos_idx, neg_idx))
+        # print("pos nevgative idx : ", len(idx))
         regression_target = self.box_coder.encode(gt_box[matched_idx[pos_idx]], anchor[pos_idx])
 
         objectness_loss = F.binary_cross_entropy_with_logits(objectness[idx], label[idx])
@@ -83,8 +84,8 @@ class RPNetwork(nn.Module):
         if target is not None:
             anchor = self.anchor_generator(feature, image_shape)
             gt_box = target['boxes'].to(anchor.device)
-            print("Anchor : ", anchor.shape)
-            print("device check : ", gt_box.device, anchor.device)
+            # print("Anchor : ", anchor.shape)
+            # print("device check : ", gt_box.device, anchor.device)
             
             objectness, pred_bbox_delta = self.head(feature)
             objectness = objectness.permute(0, 2, 3, 1).flatten()

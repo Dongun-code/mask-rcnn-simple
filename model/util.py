@@ -65,7 +65,7 @@ class AnchorGenerator:
         shift = torch.stack((x,y, x,y), dim=1).reshape(-1, 1, 4)
 
         anchor = (shift + self.cell_anchor).reshape(-1, 4)
-        print("Anchor : ", anchor)
+        # print("Anchor : ", anchor)
         return anchor
 
     def cached_grid_anchor(self, grid_size, stride):

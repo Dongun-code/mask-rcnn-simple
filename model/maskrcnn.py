@@ -1,10 +1,14 @@
 from model.rpnetowrk import RPNHead, RPNetwork
 import torch.nn as nn
-import torch.functional as F
+import torch.nn.functional as F
 from model.backbone import backbone_factory
 from model.util import AnchorGenerator
 from model.pooler import ROIAlign
 from model.transfrom import Transformer
+from model.roi_head import ROIHeads
+from collections import OrderedDict
+from model.pooler import ROIAlign
+
 
 class MaskRCNN(nn.Module):
     def __init__(self, backbone, num_classes,
@@ -49,14 +53,25 @@ class MaskRCNN(nn.Module):
         box_roi_pool = ROIAlign(output_size=(7, 7), sampling_ratio=2)
 
         resolution = box_roi_pool.output_size[0]
+        print("ROI ALign shape" , box_roi_pool.output_size)
         in_channels = out_channels * resolution ** 2
         mid_channels = 1024
         box_predictor = FastRCNNPredictor(in_channels, mid_channels, num_classes)
 
-        # self.head = ROIHeads(
-            
-        # )
-        # self.head.mask_roi_pool = ROIAlign(output_size=(14, 14), sampling_ratio=2)
+        self.head = ROIHeads(
+            box_roi_pool, box_predictor,
+            box_fg_iou_thresh, box_bg_iou_thresh,
+            box_num_sampeles, box_positive_fraction,
+            box_reg_weights,
+            box_score_thresh, box_nms_thresh, box_num_detection            
+        )
+
+        self.head.mask_roi_pool = ROIAlign(output_size=(14, 14), sampling_ratio=2)
+        
+        layers = (256, 256, 256, 256)
+        dim_reduced = 256
+        self.head.mask_predictor = MaskRCNNPredictor(out_channels, layers, dim_reduced, num_classes)
+
         self.transformer = Transformer(
             min_size=800, max_size=1300,
             image_mean=[0.485, 0.456, 0.406],
@@ -73,12 +88,15 @@ class MaskRCNN(nn.Module):
         feature, C5 = self.backbone(img)
 
         proposal, rpn_losses = self.rpn(C5, image_shape, target)
-        
+        # print("proposal", proposal.shape)
+        result, roi_losses = self.head(C5, proposal, image_shape, target)
 
+        if self.training:
+            return dict(**rpn_losses, **roi_losses)
+        else:
+            result = self.transformer.postpreocess(result, image_shape, ori_image_shape)
+            return result
 
-
-        # proposal, rpn_losses = self.rpn(feature, image_shape, target)
-        # result, roi_losses = self.head
 
 
 class FastRCNNPredictor(nn.Module):
@@ -99,6 +117,33 @@ class FastRCNNPredictor(nn.Module):
         return score, bbox_delta
 
 
-class resnet101_maskrcnn(nn.Module):
-    def __init__(self):
-        super().__init__()
+class MaskRCNNPredictor(nn.Sequential):
+    def __init__(self, in_channels, layers, dim_reduced, num_classes):
+        """
+        Arguments:
+            in_channels (int)
+            layers (Tuple[int])
+            dim_reduced (int)
+            num_classes (int)
+        """
+        
+        d = OrderedDict()
+        next_feature = in_channels
+        for layer_idx, layer_features in enumerate(layers, 1):
+            d['mask_fcn{}'.format(layer_idx)] = nn.Conv2d(next_feature, layer_features, 3, 1, 1)
+            d['relu{}'.format(layer_idx)] = nn.ReLU(inplace=True)
+            next_feature = layer_features
+        
+        d['mask_conv5'] = nn.ConvTranspose2d(next_feature, dim_reduced, 2, 2, 0)
+        d['relu5'] = nn.ReLU(inplace=True)
+        d['mask_fcn_logits'] = nn.Conv2d(dim_reduced, num_classes, 1, 1, 0)
+        super().__init__(d)
+
+        for name, param in self.named_parameters():
+            if 'weight' in name:
+                nn.init.kaiming_normal_(param, mode='fan_out', nonlinearity='relu')
+
+# class resnet101_maskrcnn(nn.Module):
+#     def __init__(self):
+#         super().__init__()
+
