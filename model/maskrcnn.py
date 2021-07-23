@@ -1,6 +1,7 @@
 from model.rpnetowrk import RPNHead, RPNetwork
 import torch.nn as nn
 import torch.nn.functional as F
+import torch
 from model.backbone import backbone_factory
 from model.util import AnchorGenerator
 from model.pooler import ROIAlign
@@ -36,7 +37,7 @@ class MaskRCNN(nn.Module):
         anchor_ratios = (0.5, 1, 2)
         num_anchors = len(anchor_sizes) * len(anchor_ratios)
         rpn_anchor_generator = AnchorGenerator(anchor_sizes, anchor_ratios)
-        print("rpn_anchor_generator : ", rpn_anchor_generator)
+        # print("rpn_anchor_generator : ", rpn_anchor_generator)
         rpn_head = RPNHead(out_channels, num_anchors)
 
         rpn_pre_nms_top_n = dict(training=rpn_pre_nms_top_n_train, testing=rpn_pre_nms_top_n_test)
@@ -79,6 +80,12 @@ class MaskRCNN(nn.Module):
 
 
     def forward(self, image, target=None):
+        # print("@@@@TYPE : ",type(image))
+        # image = np.array(image)
+        # print("Image type : ", type(image))
+        # image = torch.tensor(image)
+        # print("TG:", target)
+        # image = torch.FloatTensor(image)
         ori_image_shape = image.shape[-2:]
         image, target = self.transformer(image, target)
         image_shape = image.shape[-2:]

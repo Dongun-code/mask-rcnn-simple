@@ -72,13 +72,20 @@ class coco_set(torch.utils.data.Dataset):
                 mask = torch.tensor(mask, dtype=torch.uint8)
                 masks.append(mask)
             # bbox = int(bbox)
-
+            
+            num_objs = len(labels)
+            iscrowd = torch.zeros((num_objs,), dtype=torch.int64)
             img = transforms.ToTensor()(img)
+            img_shape =  img.shape[-2:]
+            img_shape = torch.tensor(img_shape, dtype=torch.uint8)
             boxes = torch.tensor(boxes, dtype=torch.float32)
             boxes = self.convert_to_xyxy(boxes)
+            area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
             category = torch.tensor(category)
             masks = torch.stack(masks)
-            target = dict(boxes=boxes, labels=category, masks=masks)
+            image_id = torch.tensor([idx])
+            # obj_ids = np.nique(masks)
+            target = dict(boxes=boxes, labels=category, masks=masks, image_id=image_id, area=area, iscrowd=iscrowd, img_shape=img_shape)
 
         return img, target
 
@@ -98,5 +105,5 @@ class coco_set(torch.utils.data.Dataset):
 
 if __name__ == "__main__":
     coco = coco_set(cfg.COCO_PATH, 'val')
-    img, category, boxes, masks = coco[1]
-    print(img.shape, category.shape, boxes.shape, masks.shape)
+    img, target = coco[1]
+    # print(img.shape, category.shape, boxes.shape, masks.shape)

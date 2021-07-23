@@ -11,8 +11,19 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch):
 
         losses = model(image, target)
         total_loss = sum(losses.values())
-        
+
         total_loss.backward()
         optimizer.step()
         optimizer.zero_grad
-        print(f"{num_iters}: total_loss : {total_loss}")
+        if i % 15 == 0:
+            print(f"{num_iters}: total_loss : {total_loss}")
+            print(f"roi_objectness_loss : {losses['roi_classifier_loss']}, roi_box_loss : {losses['roi_box_loss']}, roi_mask_loss : {losses['roi_mask_loss']}")
+
+
+    # print("[Epoch end!] : total_loss : ")
+
+
+
+def evaluate(mode, data_loader, device):
+    
+    dataset = data_loader 

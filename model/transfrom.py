@@ -14,6 +14,7 @@ class Transformer:
         self.image_std = image_std
 
     def __call__(self, image, target):
+        self.target = target
         image = self.normalized(image)
         image, target = self.resize(image, target)
         # print("After resize : ", image.shape)
