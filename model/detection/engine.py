@@ -35,15 +35,15 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
         # print(images)
         # print("=======================================")
         # print(targets)
-        images = images[0]
-        targets = targets[0]
-        # images = list(image.to(device) for image in images)
-        images = images.to(device)
+        # images = images[0]
+        # targets = targets[0]
+        images = list(image.to(device) for image in images)
+        # images = images.to(device)
         # print(type(images))
         # images = images.to(device)
-        targets = {k: v.to(device) for k, v in targets.items()}
+        # targets = {k: v.to(device) for k, v in targets.items()}
         # targets = targets.to(device)
-        # targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
         loss_dict = model(images, targets)
 

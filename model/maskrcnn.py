@@ -1,3 +1,4 @@
+from typing import List, Tuple
 from model.rpnetowrk import RPNHead, RPNetwork
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,7 +10,8 @@ from model.transfrom import Transformer
 from model.roi_head import ROIHeads
 from collections import OrderedDict
 from model.pooler import ROIAlign
-
+from model.image_list import to_image_list
+import matplotlib.pyplot as plt
 
 class MaskRCNN(nn.Module):
     def __init__(self, backbone, num_classes,
@@ -80,23 +82,23 @@ class MaskRCNN(nn.Module):
 
 
     def forward(self, image, target=None):
-        # print("@@@@TYPE : ",type(image))
-        # image = np.array(image)
-        # print("Image type : ", type(image))
-        # image = torch.tensor(image)
-        # print("TG:", target)
-        # image = torch.FloatTensor(image)
-        ori_image_shape = image.shape[-2:]
-        image, target = self.transformer(image, target)
-        image_shape = image.shape[-2:]
+        #   batch size need concat
 
-        img = image.cuda()
-        # print("im avlie")
-        feature, C5 = self.backbone(img)
+        original_image_sizes : List[Tuple[int, int]] = []
 
-        proposal, rpn_losses = self.rpn(C5, image_shape, target)
+        for img in image:
+            val = img.shape[-2:]
+            assert len(val) == 2
+            original_image_sizes.append((val[0], val[1]))
+        # print("origin : ", original_image_sizes)
+
+        images, targets = self.transformer(image, target)
+
+        feature, C5 = self.backbone(img.tensors)
+        print("C5 : ", C5.shape)
+        proposal, rpn_losses = self.rpn(C5, img.image_sizes, target)
         # print("proposal", proposal.shape)
-        result, roi_losses = self.head(C5, proposal, image_shape, target)
+        result, roi_losses = self.head(C5, proposal, img, target)
 
         if self.training:
             return dict(**rpn_losses, **roi_losses)

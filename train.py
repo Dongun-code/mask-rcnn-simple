@@ -49,7 +49,7 @@ def main():
     # d_train = torch.utils.data.Subset(dataset_train, indices)
     # d_train = torch.utils.data.DataLoader(dataset_train, batch_size=1, 
     #                                         shuffle=True, num_workers=0)
-    d_train = torch.utils.data.DataLoader(dataset_train, batch_size=1, 
+    d_train = torch.utils.data.DataLoader(dataset_train, batch_size=2, 
                                             shuffle=True, num_workers=0,
                                             collate_fn=utils.collate_fn)  
     d_val = torch.utils.data.DataLoader(dataset_val, batch_size=1, 
@@ -74,7 +74,7 @@ def main():
                                                     gamma=0.1)
     # model.train()
     start_epoch = 0
-    end_epoch = 20
+    end_epoch = 1
 
     for epoch in range(start_epoch, end_epoch):
         

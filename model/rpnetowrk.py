@@ -82,7 +82,8 @@ class RPNetwork(nn.Module):
 
     def forward(self, feature, image_shape, target=None):
         if target is not None:
-            anchor = self.anchor_generator(feature, image_shape)
+            print("Featrue : ", feature.shape)
+            anchor = self.anchor_generator(feature, image_shape.image_size)
             gt_box = target['boxes'].to(anchor.device)
             # print("Anchor : ", anchor.shape)
             # print("device check : ", gt_box.device, anchor.device)

@@ -3,7 +3,7 @@ import datetime
 import errno
 import os
 import time
-
+import numpy as np
 import torch
 import torch.distributed as dist
 
@@ -204,21 +204,7 @@ class MetricLogger(object):
 
 
 def collate_fn(batch):
-    # print(batch)
-    # print("-------------")
-    # print(*batch)
     return tuple(zip(*batch))
-    # images = [data[0] for data in batch]
-    # labels = [data[1:][0] for data in batch]
-    # return images, labels
-    # print(images)
-    # print(labels)
-    # labels
-    # print("Test : ",batch[:, 0])
-    # return batch
-    # return image, label
-    # print(batch)
-    # return tuple(zip(*batch))
 
 
 def warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor):
