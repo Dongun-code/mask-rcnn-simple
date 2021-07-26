@@ -8,29 +8,33 @@ class Boxcoder:
         self.weights = weights
         self.bbox_xform_clip = bbox_xform_clip
 
-    def encode(self, referebce_box, proposal):
+    def encode(self, reference_boxes, proposal):
         """
         Encode a set of poroposals with respect to some
         reference boxes
+        # type: (List[Tensor], List[Tensor]) -> List[Tensor]
         """
+        boxes_per_image = [len(box) for box in reference_boxes]
+        print("ref : ", reference_boxes)
 
-        width = proposal[:, 2] - proposal[:, 0]
-        height = proposal[:, 3] - proposal[:, 1]
-        ctr_x = proposal[:, 0] + 0.5 * width
-        ctr_y = proposal[:, 1] + 0.5 * height
+        # print(boxes_per_image)
+        # width = proposal[:, 2] - proposal[:, 0]
+        # height = proposal[:, 3] - proposal[:, 1]
+        # ctr_x = proposal[:, 0] + 0.5 * width
+        # ctr_y = proposal[:, 1] + 0.5 * height
 
-        gt_width = referebce_box[:, 2] - referebce_box[:, 0]
-        gt_height = referebce_box[:, 3] - referebce_box[:, 1]
-        gt_ctr_x = referebce_box[:, 0] + 0.5 * gt_width
-        gt_ctr_y = referebce_box[:, 1] + 0.5 * gt_height
+        # gt_width = reference_boxes[:, 2] - reference_boxes[:, 0]
+        # gt_height = reference_boxes[:, 3] - reference_boxes[:, 1]
+        # gt_ctr_x = reference_boxes[:, 0] + 0.5 * gt_width
+        # gt_ctr_y = reference_boxes[:, 1] + 0.5 * gt_height
 
-        dx = self.weights[0] * (gt_ctr_x - ctr_x) / width
-        dy = self.weights[1] * (gt_ctr_y - ctr_y) / height
-        dw = self.weights[2] * torch.log(gt_width / width)
-        dh = self.weights[3] * torch.log(gt_height / height)
+        # dx = self.weights[0] * (gt_ctr_x - ctr_x) / width
+        # dy = self.weights[1] * (gt_ctr_y - ctr_y) / height
+        # dw = self.weights[2] * torch.log(gt_width / width)
+        # dh = self.weights[3] * torch.log(gt_height / height)
 
-        delta = torch.stack((dx, dy, dw, dh), dim=1)
-        return delta
+        # delta = torch.stack((dx, dy, dw, dh), dim=1)
+        # return delta
 
     def decode(self, delta, box):
         """
@@ -41,32 +45,32 @@ class Boxcoder:
             delta (Tensor[N, 4]): encoded boxes.
             boxes (Tensor[N, 4]): reference boxes.
         """
+        pass
+        # dx = delta[:, 0] / self.weights[0]
+        # dy = delta[:, 1] / self.weights[1]
+        # dw = delta[:, 2] / self.weights[2]
+        # dh = delta[:, 3] / self.weights[3]
 
-        dx = delta[:, 0] / self.weights[0]
-        dy = delta[:, 1] / self.weights[1]
-        dw = delta[:, 2] / self.weights[2]
-        dh = delta[:, 3] / self.weights[3]
+        # dw = torch.clamp(dw, max = self.bbox_xform_clip)
+        # dh = torch.clamp(dh, max = self.bbox_xform_clip)
 
-        dw = torch.clamp(dw, max = self.bbox_xform_clip)
-        dh = torch.clamp(dh, max = self.bbox_xform_clip)
+        # width = box[:, 2] - box[:, 0]
+        # height = box[:, 3] - box[:, 1]
+        # ctr_x = box[:, 0] + 0.5 * width
+        # ctr_y = box[:, 1] + 0.5 * height
 
-        width = box[:, 2] - box[:, 0]
-        height = box[:, 3] - box[:, 1]
-        ctr_x = box[:, 0] + 0.5 * width
-        ctr_y = box[:, 1] + 0.5 * height
+        # pred_ctr_x = dx * width * ctr_x
+        # pred_ctr_y = dy * height * ctr_y
+        # pred_w = torch.exp(dw) * width
+        # pred_h = torch.exp(dh) * height
 
-        pred_ctr_x = dx * width * ctr_x
-        pred_ctr_y = dy * height * ctr_y
-        pred_w = torch.exp(dw) * width
-        pred_h = torch.exp(dh) * height
+        # xmin = pred_ctr_x - 0.5 * pred_w
+        # ymin = pred_ctr_y - 0.5 * pred_h
+        # xmax = pred_ctr_x + 0.5 * pred_w
+        # ymax = pred_ctr_y + 0.5 * pred_h
 
-        xmin = pred_ctr_x - 0.5 * pred_w
-        ymin = pred_ctr_y - 0.5 * pred_h
-        xmax = pred_ctr_x + 0.5 * pred_w
-        ymax = pred_ctr_y + 0.5 * pred_h
-
-        target = torch.stack((xmin, ymin, xmax, ymax), dim=1)
-        return target
+        # target = torch.stack((xmin, ymin, xmax, ymax), dim=1)
+        # return target
 
 def process_box(box, score, image_shape, min_size):
     """

@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 from model.backbone import backbone_factory
-from model.util import AnchorGenerator
+# from model.util import AnchorGenerator
 from model.pooler import ROIAlign
 from model.transfrom import Transformer
 from model.roi_head import ROIHeads
@@ -12,7 +12,7 @@ from collections import OrderedDict
 from model.pooler import ROIAlign
 from model.image_list import to_image_list
 import matplotlib.pyplot as plt
-
+from torchvision.models.detection.anchor_utils import AnchorGenerator
 class MaskRCNN(nn.Module):
     def __init__(self, backbone, num_classes,
                  #  RPN parameters
@@ -35,12 +35,16 @@ class MaskRCNN(nn.Module):
         self.backbone = backbone_factory('resnet101', stage5 = True)
         out_channels = 2048
         #   RPN
-        anchor_sizes = (128, 256, 512)
-        anchor_ratios = (0.5, 1, 2)
-        num_anchors = len(anchor_sizes) * len(anchor_ratios)
-        rpn_anchor_generator = AnchorGenerator(anchor_sizes, anchor_ratios)
+
+        # rpn_anchor_generator = AnchorGenerator(anchor_sizes, anchor_ratios)
+        anchor_sizes = ((32, 64, 128, 256, 512),)
+        aspect_ratios = ((0.5, 1.0, 2.0),)
+        num_anchors = len(anchor_sizes) * len(aspect_ratios)
+        rpn_anchor_generator = AnchorGenerator(
+            anchor_sizes, aspect_ratios
+        )
         # print("rpn_anchor_generator : ", rpn_anchor_generator)
-        rpn_head = RPNHead(out_channels, num_anchors)
+        rpn_head = RPNHead(out_channels, rpn_anchor_generator.num_anchors_per_location()[0])
 
         rpn_pre_nms_top_n = dict(training=rpn_pre_nms_top_n_train, testing=rpn_pre_nms_top_n_test)
         rpn_post_nms_top_n = dict(training=rpn_post_nms_top_n_train, testing=rpn_post_nms_top_n_test)
@@ -90,13 +94,28 @@ class MaskRCNN(nn.Module):
             val = img.shape[-2:]
             assert len(val) == 2
             original_image_sizes.append((val[0], val[1]))
-        # print("origin : ", original_image_sizes)
 
         images, targets = self.transformer(image, target)
 
-        feature, C5 = self.backbone(img.tensors)
-        print("C5 : ", C5.shape)
-        proposal, rpn_losses = self.rpn(C5, img.image_sizes, target)
+        if targets is not None:
+            for target_idx, target in enumerate(targets):
+                boxes = target['boxes']
+                degenrate_boxes = boxes[:, 2:] <= boxes[:, :2]
+                if degenrate_boxes.any():
+                    # print the first degenerate box
+                    bb_idx = torch.where(degenrate_boxes.any(dim=1))[0][0]
+                    degen_bb: List[float] = boxes[bb_idx].tolist()
+                    raise ValueError("All bounding boxes should have positive height and width."
+                                     " Found invalid box {} for target at index {}."
+                                     .format(degen_bb, target_idx))                                                   
+
+        feature, C5 = self.backbone(images.tensors)
+        # if you use C1,C2...C5 features set
+        # you don't need it.
+        if isinstance(C5, torch.Tensor):
+            C5 = OrderedDict([('0', C5)])
+
+        proposal, rpn_losses = self.rpn(C5, images, target)
         # print("proposal", proposal.shape)
         result, roi_losses = self.head(C5, proposal, img, target)
 

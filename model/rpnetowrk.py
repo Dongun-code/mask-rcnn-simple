@@ -11,20 +11,65 @@ class RPNHead(nn.Module):
         super(RPNHead, self).__init__()
 
         self.conv = nn.Conv2d(in_channels, in_channels, kernel_size=3, stride = 1, padding = 1)
-        self.cls_logits = nn.Conv2d(in_channels, num_anchors, kernel_size=1)
-        self.bbox_pred = nn.Conv2d(in_channels, 4 * num_anchors, 1)
+        self.cls_logits = nn.Conv2d(in_channels, num_anchors, kernel_size=1, stride=1)
+        self.bbox_pred = nn.Conv2d(in_channels, 4 * num_anchors, kernel_size = 1, stride=1)
 
         for i in self.children():
             nn.init.normal_(i.weight, std=0.01)
             nn.init.constant_(i.bias, 0)
 
     def forward(self, x):
-        x = F.relu(self.conv(x))
-        logits = self.cls_logits(x)
-        bbox_reg = self.bbox_pred(x)
+        #   type: (List[Tensor]) -> Tuple[List[Tensor], List[Tensor]]
+        logits = []
+        bbox_reg = []
+        for feature in x:
+            x = F.relu(self.conv(feature))
+            logits.append(self.cls_logits(x))
+            bbox_reg.append(self.bbox_pred(x))
 
         return logits, bbox_reg
-            
+
+
+def permute_and_flatten(layer, N, A, C, H, W):
+    # type: (Tensor, int, int, int, int, int) -> Tensor
+    layer = layer.view(N, -1, C, H, W)
+    layer = layer.permute(0, 3 ,4, 1, 2)
+    layer = layer.reshape(N, -1, C)
+    return layer
+
+def concat_box_prediction_layers(box_cls, box_regression):
+    # type: (List[Tensor], List[Tensor]) -> Tuple[Tensor, Tensor]
+    box_cls_flattened = []
+    box_regression_flattened = []
+    # for each feature, level permte the outputs to make them be 
+    # in the same format as the labels. Note that the labels are computed for
+    # all features levels concatenated, so we keep the same representation
+    # for the objectness and the box_regression
+    for box_cls_per_level, box_regression_per_level in zip(box_cls, box_regression):
+        # print(box_cls_per_level.shape)
+        N, AxC, H, W = box_cls_per_level.shape
+        print(box_regression_per_level.shape)
+        Ax4 = box_regression_per_level.shape[1]
+        A = Ax4 // 4
+        C = AxC // A
+
+        box_cls_per_level = permute_and_flatten(box_cls_per_level, N, A, C, H, W)
+        box_cls_flattened.append(box_cls_per_level)
+
+        box_regression_per_level = permute_and_flatten(box_regression_per_level, N, A, 4, H, W)
+        box_regression_flattened.append(box_regression_per_level)
+
+        # concatenate on the first dimension (representing the features levels), to
+        # take into account the way the labels were generated (with all feature maps
+        # being concatenated as well)
+
+        # box_cls = torch.cat(box_cls_flattened, dim=1)
+        box_cls = torch.cat(box_cls_flattened, dim=1).flatten(0, -2)
+        # print(box_cls.shape)
+        box_regression = torch.cat(box_regression_flattened, dim=1).reshape(-1, 4)
+        
+        return box_cls, box_regression
+
 
 class RPNetwork(nn.Module):
     def __init__(self, anchor_generator, head, 
@@ -80,24 +125,42 @@ class RPNetwork(nn.Module):
 
         return objectness_loss, box_loss
 
-    def forward(self, feature, image_shape, target=None):
-        if target is not None:
-            print("Featrue : ", feature.shape)
-            anchor = self.anchor_generator(feature, image_shape.image_size)
-            gt_box = target['boxes'].to(anchor.device)
-            # print("Anchor : ", anchor.shape)
-            # print("device check : ", gt_box.device, anchor.device)
-            
-            objectness, pred_bbox_delta = self.head(feature)
-            objectness = objectness.permute(0, 2, 3, 1).flatten()
-            pred_bbox_delta = pred_bbox_delta.permute(0, 2, 3, 1).reshape(-1, 4)
-
-            proposal = self.create_proposal(anchor, objectness.detach(), pred_bbox_delta.detach(), image_shape)
-            if self.training:
-                objectness_loss, box_loss = self.compute_loss(objectness, pred_bbox_delta, gt_box, anchor)
-                return proposal, dict(rpn_objectness_loss=objectness_loss, rpn_box_loss=box_loss)
+    def forward(self, features, images, targets=None):
+        """
+        feature : Dict[str, Tensor]
+        images  : ImageList
+        targets : Optional[List[Dict[str, Tensor]]]
+        """
+        features = list(features.values())
+        objectness, pred_bbox_delta = self.head(features)
+        anchors = self.anchor_generator(images, features)
+        print("Anchors : ", anchors[0].shape)
         
-        return proposal, {}
+        num_images = len(anchors)
+        num_anchors_per_level_shape_tensors = [ojt[0].shape for ojt in objectness]
+        print(num_anchors_per_level_shape_tensors)
+        num_anchors_per_level = [s[0] * s[1] * s[2] for s in num_anchors_per_level_shape_tensors]        
+        print(num_anchors_per_level)
+        objectness, pred_bbox_delta = \
+            concat_box_prediction_layers(objectness, pred_bbox_delta)
+        
+        proposals = self.box_coder.decode(pred_bbox_delta.detach(), anchors)
+        print("proposal : ", proposals.shape)
+        proposals = proposals.view(num_images, -1, 4)
+        print("proposal : ", proposals.shape)
+        # if self.training:
+        #     assert targets is not None
+        #     # print("Featrue : ", feature.shape)
+        #     gt_box = targets['boxes'].to(anchors.device)
+        #     objectness = objectness.permute(0, 2, 3, 1).flatten()
+        #     pred_bbox_delta = pred_bbox_delta.permute(0, 2, 3, 1).reshape(-1, 4)
+
+        #     proposal = self.create_proposal(anchors, objectness.detach(), pred_bbox_delta.detach(), image_shape)
+
+        #     objectness_loss, box_loss = self.compute_loss(objectness, pred_bbox_delta, gt_box, anchor)
+        #     return proposal, dict(rpn_objectness_loss=objectness_loss, rpn_box_loss=box_loss)
+    
+        # return proposal, {}
 
 
 
